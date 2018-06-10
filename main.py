@@ -35,7 +35,6 @@ def calc_histr(inputpath,T,image_names,H):
 def k_means(K,image_histr):
     return None
 
-
 if __name__== '__main__':
     main()
 
