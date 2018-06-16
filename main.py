@@ -2,24 +2,24 @@ import os
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
-import time
-from threading import Thread
 
 
 def main(INPUTPATH, K, T, H, it, n, OUTPUTPATH):
-    INPUTPATH = "C:/Users/Manue/Documents/IA/ProyectoIA/prueba"
+    INPUTPATH = "C:/Users/Manue/Documents/IA/ProyectoIA/frames"
     OUTPUTPATH = "C:/Users/Manue/Documents/IA/ProyectoIA/results"
     image_names = os.listdir(INPUTPATH)
     print('Image names:')
     print(image_names)
     print('-------------------')
     image_histr = calc_histr(INPUTPATH, T, image_names, H)
-    k_means(K, image_histr, int(sum(image_histr['images-0893.jpg']['b'])), H, it, n)
+    centroids = k_means(K, image_histr[0], H, it, n)
+    write_keyframes(image_histr[1], image_histr[0], centroids, OUTPUTPATH)
 
 
 
-def calc_histr(inputpath,T,image_names,H):
+def calc_histr(inputpath, T, image_names, H):
     image_histr = []
+    name_image = dict()
     for i in range(0, len(image_names), T):
         input_path = os.path.join(inputpath, image_names[i])
 
@@ -27,6 +27,7 @@ def calc_histr(inputpath,T,image_names,H):
         # cv2.imshow('scene', img)
         # width, heigth, chanels = img.shape
         color = ('b', 'g', 'r')
+        name_image[image_names[i]] = img
 
         histr = dict()
         for j, col in enumerate(color):
@@ -38,18 +39,18 @@ def calc_histr(inputpath,T,image_names,H):
         # print(str(histr) + ' ' + str(i))
         image_histr.append((image_names[i], histr))
 
-    return dict(image_histr)
+    return [dict(image_histr), name_image]
 
 
-def k_means(K, image_histr, size, H, iterations, n, centroids = None):
-
+def k_means(K, image_histr, H, iterations, n, centroids = None):
     color = ('b', 'g', 'r')
+    last_centroids = None
+
     for it in range(0, iterations):
         if centroids is None:
             centroids = dict()
             for i in range(0, K):
                 histr = None
-                random_hist = None
                 for j in range(0, n):
                     random_hist = np.random.choice(list(image_histr.values()))
 
@@ -57,7 +58,7 @@ def k_means(K, image_histr, size, H, iterations, n, centroids = None):
                     if histr is None:
                         histr = random_hist
                     else:
-                        histr = {key_h : [sum(x) for x in zip(*[histr[key_h], random_hist[key_h]])] for key_h in histr}
+                        histr = {key_h: [sum(x) for x in zip(*[histr[key_h], random_hist[key_h]])] for key_h in histr}
 
                 for col in color:
                     plt.plot(histr[col])
@@ -65,10 +66,10 @@ def k_means(K, image_histr, size, H, iterations, n, centroids = None):
 
                 centroids[i] = histr
 
-        classified_images = {k:[] for k, k_histr in centroids.items()}
+        classified_images = {k: [] for k, k_histr in centroids.items()}
         print('Iteration number: '+str(it))
         for name, img_histr in image_histr.items():
-            min_histr = []
+            # min_histr = []
             min_k = -1
             min_value = float('inf')
             for k, k_histr in centroids.items():
@@ -79,14 +80,9 @@ def k_means(K, image_histr, size, H, iterations, n, centroids = None):
                 if value_acumulated < min_value:
                     min_value = value_acumulated
                     min_k = k
-                    min_histr = k_histr
+                    # min_histr = k_histr
             classified_images[min_k].append(name)
         print('Classified images: ' + str(classified_images))
-
-        centroids = dict()
-        for classes in classified_images.values():
-            if not classes:
-                return centroids
 
         for k in classified_images:
             histr = None
@@ -95,12 +91,42 @@ def k_means(K, image_histr, size, H, iterations, n, centroids = None):
                     histr = {key: [int(values)/len(classified_images[k]) for values in image_histr[name][key]] for key in image_histr[name]}
                 else:
                     histr = {key_h: [sum(x)/len(classified_images[k]) for x in zip(*[histr[key_h], image_histr[name][key_h]])] for key_h in histr}
+            if len(classified_images[k]) > 0:
+                centroids[k] = histr
 
-            centroids[k] = histr
-        print('New centroids : '+ str(centroids))
+        print('New centroids : ' + str(centroids))
+        if last_centroids is None:
+            last_centroids = centroids
+        else:
+            if last_centroids.values() == centroids.values():
+                break
+            else:
+                last_centroids = centroids
     return centroids
 
 
+def write_keyframes(images, histograms, centroids, output):
+
+    image_names = os.listdir(output)
+    for name in image_names:
+        os.remove(output+'/'+name)
+    color = ('b', 'g', 'r')
+    keyframes = dict()
+
+    for i, k_histr in centroids.items():
+        min_value = float('inf')
+        for name, histr in histograms.items():
+            value_acumulated = 0
+            for j, col in enumerate(color):
+                value_acumulated += sum(np.sqrt(np.power([x1 - x2 for (x1, x2) in zip(histr[col], k_histr[col])], 2)))
+            if value_acumulated < min_value:
+                min_value = value_acumulated
+                keyframes[i] = name
+    print('Writed images: ' + str(keyframes))
+    for i, name in keyframes.items():
+        cv2.imwrite(output+'/'+name, images[name])
+
+
 if __name__ == '__main__':
-    main(None, 2, 1, 256, 100, 3, None)
+    main(None, 2, 50, 256, 100, 5, None)
 
