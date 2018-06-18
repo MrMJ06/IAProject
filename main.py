@@ -8,12 +8,14 @@ def main(INPUTPATH, K, T, H, it, n, OUTPUTPATH):
     INPUTPATH = "C:/Users/Manue/Documents/IA/ProyectoIA/frames"
     OUTPUTPATH = "C:/Users/Manue/Documents/IA/ProyectoIA/results"
     image_names = os.listdir(INPUTPATH)
-    print('Image names:')
-    print(image_names)
-    print('-------------------')
+    image_names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
+
+    print('Image names:'+str(image_names))
+    print('-------------------\n\n')
     image_histr = calc_histr(INPUTPATH, T, image_names, H)
     centroids = k_means(K, image_histr[0], H, it, n)
-    write_keyframes(image_histr[1], image_histr[0], centroids, OUTPUTPATH)
+    keyframes = write_keyframes(image_histr[1], image_histr[0], centroids, OUTPUTPATH)
+    write_video(image_names, keyframes, INPUTPATH, OUTPUTPATH, 30, image_histr[1])
 
 
 
@@ -126,7 +128,32 @@ def write_keyframes(images, histograms, centroids, output):
     for i, name in keyframes.items():
         cv2.imwrite(output+'/'+name, images[name])
 
+    return keyframes
+
+
+def write_video(image_names, keyframes, input, output, amount, images):
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    img = list(images.values())[0]
+    heigth, width, chanels = img.shape
+    video = cv2.VideoWriter(output + '/result.avi', fourcc, 30.0, (width, heigth))
+    names = list(keyframes.values())
+    names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
+
+    for k in names:
+        index = image_names.index(str(k))
+        upIndex = index + amount
+        downIndex = index - amount
+        if upIndex > len(image_names):
+            upIndex = len(image_names)
+        if downIndex < 0:
+            downIndex = 0
+        for image in image_names[downIndex:upIndex]:
+            print('writing:' + image)
+            video.write(cv2.imread(input + '/' + image))
+    video.release()
+    cv2.destroyAllWindows()
+
 
 if __name__ == '__main__':
-    main(None, 2, 50, 256, 100, 5, None)
+    main(None, 10, 50, 256, 10, 3, None)
 
