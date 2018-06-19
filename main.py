@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 
-def main(INPUTPATH, K, T, H, it, n, OUTPUTPATH):
+def main(INPUTPATH, K, T, H, it, n, s, OUTPUTPATH):
     INPUTPATH = "C:/Users/Manue/Documents/IA/ProyectoIA/frames"
     OUTPUTPATH = "C:/Users/Manue/Documents/IA/ProyectoIA/results"
     image_names = os.listdir(INPUTPATH)
@@ -15,7 +15,7 @@ def main(INPUTPATH, K, T, H, it, n, OUTPUTPATH):
     image_histr = calc_histr(INPUTPATH, T, image_names, H)
     centroids = k_means(K, image_histr[0], H, it, n)
     keyframes = write_keyframes(image_histr[1], image_histr[0], centroids, OUTPUTPATH)
-    write_video(image_names, keyframes, INPUTPATH, OUTPUTPATH, 30, image_histr[1])
+    write_video(keyframes, INPUTPATH, OUTPUTPATH, s, image_histr[1], image_histr[0])
 
 
 
@@ -131,29 +131,43 @@ def write_keyframes(images, histograms, centroids, output):
     return keyframes
 
 
-def write_video(image_names, keyframes, input, output, amount, images):
+def write_video(keyframes, input, output, amount, images, image_histr):
+
+    color = ('b', 'g', 'r')
+
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     img = list(images.values())[0]
     heigth, width, chanels = img.shape
     video = cv2.VideoWriter(output + '/result.avi', fourcc, 30.0, (width, heigth))
-    names = list(keyframes.values())
+    names = list(image_histr.keys())
     names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
 
     for k in names:
-        index = image_names.index(str(k))
+        index = names.index(str(k))
         upIndex = index + amount
         downIndex = index - amount
-        if upIndex > len(image_names):
-            upIndex = len(image_names)
+        if upIndex > len(names):
+            upIndex = len(names)
         if downIndex < 0:
             downIndex = 0
-        for image in image_names[downIndex:upIndex]:
-            print('writing:' + image)
-            video.write(cv2.imread(input + '/' + image))
+        for image in names[downIndex:upIndex]:
+            min_value = float('inf')
+            min_keyframe = None
+            for i, keyframe in keyframes.items():
+                value = 0
+                for col in color:
+                    value += sum(np.sqrt(np.power([x1 - x2 for (x1, x2) in zip(image_histr[keyframe][col], image_histr[image][col])], 2)))
+                if value < min_value:
+                    min_keyframe = keyframe
+                    min_value = value
+            if min_keyframe == k:
+                print('writing:' + image)
+                video.write(cv2.imread(input + '/' + image))
     video.release()
     cv2.destroyAllWindows()
+    print('\n\nOK your video is available')
 
 
 if __name__ == '__main__':
-    main(None, 10, 50, 256, 10, 3, None)
+    main(None, 20, 10, 256, 10, 3, 30, None)
 
