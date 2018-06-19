@@ -5,6 +5,7 @@ import numpy as np
 
 
 def main(INPUTPATH, K, T, H, it, n, s, OUTPUTPATH):
+
     INPUTPATH = "C:/Users/Manue/Documents/IA/ProyectoIA/frames"
     OUTPUTPATH = "C:/Users/Manue/Documents/IA/ProyectoIA/results"
     image_names = os.listdir(INPUTPATH)
