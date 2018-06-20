@@ -15,7 +15,7 @@ OUTPUTPATH -> Path for the keyframes and video writing
 """
 
 
-def main(inputpath, K, T, H, it, n, s, K_knn, outputpath):
+def main(inputpath, K, T, H, it, n, s, outputpath):
 
     image_names = os.listdir(inputpath)  # Reads the image names
     image_names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))  # Sort the image names by the number in the name
@@ -37,7 +37,7 @@ def main(inputpath, K, T, H, it, n, s, K_knn, outputpath):
     keyframes = write_keyframes(name_img, name_histr, centroids, outputpath)
 
     # With the keyframes we reconstruct the summary video and write it in outpath
-    write_video(keyframes, inputpath, outputpath, s, name_img, name_histr, image_names, H, K_knn, K, classified_images)
+    write_video(keyframes, inputpath, outputpath, s, name_histr, name_img, image_names, H, centroids)
 
 
 """ ----------------------- Calc_ histr -------------------------------- """
@@ -80,7 +80,7 @@ def k_means(K, name_histr, iterations, n, centroids=None):
     last_centroids = None  # The centroids of the last iteration
 
     for it in range(0, iterations):  # The iterations will be limited
-        print('Iteration number: ' + str(it))
+        # print('Iteration number: ' + str(it))
 
         if centroids is None:  # If the initial centroids are not passed as parameter calculate k random centroids
             centroids = calc_random_centroids(K, n, name_histr)  # Return the random centroids
@@ -213,6 +213,7 @@ def write_keyframes(images, histograms, centroids, output):
             if value_acumulated < min_value:
                 min_value = value_acumulated
                 keyframes[i] = name
+                print('')
     print('Writed images: ' + str(keyframes))
     for i, name in keyframes.items():
         cv2.imwrite(output+'/'+name, images[name])
@@ -220,7 +221,7 @@ def write_keyframes(images, histograms, centroids, output):
     return keyframes
 
 
-def write_video(keyframes, input, output, S, name_img, name_histr, names, H, K_knn, K, classified_images):
+def write_video(keyframes, input, output, S, name_histr, name_img, names, H, centroids):
 
     img = list(name_img.values())[0]
     heigth, width, channels = img.shape  # Obtain the dimensions of the frames to the video
@@ -230,12 +231,8 @@ def write_video(keyframes, input, output, S, name_img, name_histr, names, H, K_k
     # Initialize the video writer
     video = cv2.VideoWriter(output + '/result.avi', fourcc, 30.0, (width, heigth))
 
-    # names = list(name_histr.keys())
-    # names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
-    keyframes_names = list(keyframes.values())
+    keyframes_names = list(set(keyframes.values()))
     keyframes_names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
-
-    print(keyframes_names)
 
     for name in keyframes_names:
         index = names.index(str(name))  # Obtain the index inside the list for the name
@@ -250,9 +247,9 @@ def write_video(keyframes, input, output, S, name_img, name_histr, names, H, K_k
 
         # For every image apply KNN algorithm
         for image in names[down_index:up_index]:
-            min_k = calc_knn(keyframes, name_histr, image, H, K_knn, K, classified_images)
-            print(min_k)
-            if name in keyframes[min_k]:
+            min_k = calc_knn(keyframes, name_histr, image, H)
+            print(image+' K:'+ str(min_k))
+            if name == keyframes[min_k]:
                 print('writing:' + image)
                 video.write(cv2.imread(input + '/' + image))
 
@@ -261,10 +258,8 @@ def write_video(keyframes, input, output, S, name_img, name_histr, names, H, K_k
     print('\n\nOK your video is available')
 
 
-def calc_knn(keyframes, name_histr, image_name, H, K_knn, K, classified_images):
+def calc_knn(keyframes, name_histr, image_name, H):
 
-    images_distances = dict()
-    nearest_keyframes = {k: 0 for k in range(0, K)}
     image_histr = dict()
     color = ('b', 'g', 'r')
     image_path = os.path.join(inputpath, image_name)
@@ -273,30 +268,22 @@ def calc_knn(keyframes, name_histr, image_name, H, K_knn, K, classified_images):
     for j, col in enumerate(color):
         image_histr[col] = list(map(lambda x: x[0], cv2.calcHist([img], [j], None, [H], [0, H])))
 
-    for i, images in classified_images.items():
-        for image in images:
-            value = 0
-            for j, col in enumerate(color):
-                value += sum(
-                    np.sqrt(np.power([x1 - x2 for (x1, x2) in zip(name_histr[image][col], image_histr[col])], 2)))
+    min_value = float('inf')
+    min_k = -1
+    for k, name in keyframes.items():
+        value = 0
+        for j, col in enumerate(color):
+            value += sum(
+                np.sqrt(np.power([x1 - x2 for (x1, x2) in zip(name_histr[name][col], image_histr[col])], 2)))
 
-            images_distances[image] = value
-
-    images_distances = sorted(images_distances, key=images_distances.get, reverse=False)
-
-    for image in images_distances[0:K_knn]:
-        for k, names in classified_images.items():
-            if image in names:
-                nearest_keyframes[k] += 1
-
-    nearest_keyframes = sorted(nearest_keyframes, key=nearest_keyframes.get, reverse=True)
-    min_k = nearest_keyframes[0]
+        if value < min_value:
+            min_value = value
+            min_k = k
 
     return min_k
 
 
 if __name__ == '__main__':
-    inputpath = "C:/Users/Manue/Documents/IA/ProyectoIA/frames"
+    inputpath = "C:/Users/Manue/Documents/IA/ProyectoIA/test"
     outputpath = "C:/Users/Manue/Documents/IA/ProyectoIA/results"
-    main(inputpath, 10, 60, 256, 1, 3, 30, 21, outputpath)
-
+    main(inputpath, 15, 60, 256, 100, 3, 30, outputpath)
