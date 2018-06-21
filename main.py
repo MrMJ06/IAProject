@@ -18,7 +18,9 @@ OUTPUTPATH -> Path for the keyframes and video writing
 def main(inputpath, K, T, H, it, n, s, outputpath):
 
     image_names = os.listdir(inputpath)  # Reads the image names
-    image_names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))  # Sort the image names by the number in the name
+
+    # Sort the image names by the number in the name
+    image_names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
 
     print('Readed images:'+str(image_names))
     print('\n\n')
@@ -34,10 +36,10 @@ def main(inputpath, K, T, H, it, n, s, outputpath):
     centroids, classified_images = k_means(K, name_histr, it, n)
 
     # With the centroids we obtain the keyframes and write them in outpath
-    keyframes = write_keyframes(name_img, name_histr, centroids, outputpath)
+    keyframes = write_keyframes(name_img, name_histr, centroids, classified_images, outputpath)
 
     # With the keyframes we reconstruct the summary video and write it in outpath
-    write_video(keyframes, inputpath, outputpath, s, name_histr, name_img, image_names, H, centroids)
+    write_video(keyframes, inputpath, outputpath, s, name_histr, name_img, image_names, H, classified_images)
 
 
 """ ----------------------- Calc_ histr -------------------------------- """
@@ -49,7 +51,7 @@ def calc_histr(inputpath, T, image_names, H):
     name_histogram = dict()
     name_image = dict()
 
-    color = ('b', 'g', 'r')  # Initiate the channels in the image
+    color = ('v', 'h', 's')  # Initiate the channels in the image
 
     # Iterate in every image name index with a skip of T frames
     for i in range(0, len(image_names), T):
@@ -60,11 +62,12 @@ def calc_histr(inputpath, T, image_names, H):
 
         img = cv2.imread(input_path)  # Read the array image in RGB
         name_image[image_names[i]] = img  # Saves the image in the dictionary
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-        for j, col in enumerate(color): # For every color chanel calculate the histgram
+        for j, col in enumerate(color):  # For every color chanel calculate the histgram
 
             # We use the map function to correct the histogram format and saves it the the histogram color channel
-            histr[col] = list(map(lambda x: x[0], cv2.calcHist([img], [j], None, [H], [0, H])))
+            histr[col] = list(map(lambda x: x[0], cv2.calcHist([hsv], [j], None, [H], [0, H])))
 
         # When the 3 color channels are calculated in the histogram we saves it in the image hisstogram dictionary
         name_histogram[image_names[i]] = histr
@@ -77,25 +80,30 @@ def calc_histr(inputpath, T, image_names, H):
 
 def k_means(K, name_histr, iterations, n, centroids=None):
 
-    last_centroids = None  # The centroids of the last iteration
+    last_classification = None  # The centroids of the last iteration
+    classified_images = dict()
+    color = ('v', 'h', 's')
 
     for it in range(0, iterations):  # The iterations will be limited
-        # print('Iteration number: ' + str(it))
+
+        print('Iteration number: ' + str(it))
 
         if centroids is None:  # If the initial centroids are not passed as parameter calculate k random centroids
             centroids = calc_random_centroids(K, n, name_histr)  # Return the random centroids
 
         classified_images = classify_images(centroids, name_histr)  # Classify the images
 
-        centroids = update_centroids(classified_images, name_histr, centroids)  # Update the centroids with the classified images
+        # Update the centroids with the classified images
+        centroids = update_centroids(classified_images, name_histr, centroids)
 
-        if last_centroids is None:  # If is the first iteration set the last centroids to this centroids
-            last_centroids = centroids
+        if last_classification is None:  # If is the first iteration set the last centroids to this centroids
+            last_classification = classified_images
         else:
-            if last_centroids.values() == centroids.values():  # If the centroids has not changed the stop
+            # If the centroids has not changed the stop
+            if list(last_classification.values()) == list(classified_images.values()):
                 break
             else:  # In other case continue
-                last_centroids = centroids
+                last_classification = classified_images
 
     return [centroids, classified_images]
 
@@ -108,7 +116,7 @@ def k_means(K, name_histr, iterations, n, centroids=None):
 def calc_random_centroids(K, n, name_histr):
 
     centroids = dict()
-    color = ('b', 'g', 'r')  # Initialize the color channels
+    color = ('v', 'h', 's')  # Initialize the color channels
 
     for i in range(0, K):
 
@@ -126,7 +134,7 @@ def calc_random_centroids(K, n, name_histr):
             else:  # In other case the histogram will be the sum of histr and the random histogram generated
                 histr = {key_h: [sum(x) for x in zip(*[histr[key_h], random_hist[key_h]])] for key_h in histr}
 
-        for col in color:
+        for col in color:   # Show the histogram
             plt.plot(histr[col])
         plt.show()
 
@@ -143,7 +151,7 @@ def calc_random_centroids(K, n, name_histr):
 def classify_images(centroids, name_histr):
 
     classified_images = {k: [] for k, k_histr in centroids.items()}  # Initialize the classified K - image dictionary
-    color = ('b', 'g', 'r')  # Initialize the color channels
+    color = ('v', 'h', 's')  # Initialize the color channels
 
     for name, img_histr in name_histr.items():  # For every image we calculate the nearest K centroid
 
@@ -178,15 +186,15 @@ def update_centroids(classified_images, name_histr, centroids):
     for k in classified_images:
 
         histr = None
+
         # Makes the mean of every image histogram
         for name in classified_images[k]:
-            if histr is None:
-                histr = {key: [int(values) / len(classified_images[k]) for values in name_histr[name][key]] for key in
+            new_histr = {key: [values / len(classified_images[k]) for values in name_histr[name][key]] for key in
                          name_histr[name]}
+            if histr is None:
+                histr = new_histr
             else:
-                histr = {
-                key_h: [sum(x) / len(classified_images[k]) for x in zip(*[histr[key_h], name_histr[name][key_h]])] for
-                key_h in histr}
+                histr = {key_h: [sum(x) for x in zip(*[histr[key_h], new_histr[key_h]])] for key_h in histr}
 
         if len(classified_images[k]) > 0:  # If the centroid has images inside then is updated
             centroids[k] = histr
@@ -196,32 +204,41 @@ def update_centroids(classified_images, name_histr, centroids):
     return centroids
 
 
-def write_keyframes(images, histograms, centroids, output):
+def write_keyframes(name_img, name_histr, centroids, classified_images, output):
 
-    image_names = os.listdir(output)
-    for name in image_names:
-        os.remove(output+'/'+name)
-    color = ('b', 'g', 'r')
+    if not os.path.isdir(output):  # If the directory not exists, creates the directory
+        os.makedirs(output)
+    else:
+        image_names = os.listdir(output)
+        for name in image_names:  # Remove the content of the directory
+            os.remove(output+'/'+name)
+
+    color = ('v', 'h', 's')
     keyframes = dict()
 
-    for i, k_histr in centroids.items():
+    for i, k_histr in centroids.items():  # First iterate over all the centroids
+
         min_value = float('inf')
-        for name, histr in histograms.items():
-            value_acumulated = 0
-            for j, col in enumerate(color):
-                value_acumulated += sum(np.sqrt(np.power([x1 - x2 for (x1, x2) in zip(histr[col], k_histr[col])], 2)))
-            if value_acumulated < min_value:
-                min_value = value_acumulated
+
+        for name in classified_images[i]:  # Now we calculate the nearest image
+
+            value_accumulated = 0
+
+            for j, col in enumerate(color):  # Calculate the euclidean distance
+                value_accumulated += sum(np.sqrt(np.power([x1 - x2 for (x1, x2) in zip(name_histr[name][col], k_histr[col])], 2)))
+
+            if value_accumulated < min_value:  # Update the minimum value and the keyframes if is closer
+                min_value = value_accumulated
                 keyframes[i] = name
-                print('')
-    print('Writed images: ' + str(keyframes))
-    for i, name in keyframes.items():
-        cv2.imwrite(output+'/'+name, images[name])
+
+    print('Writing images: ' + str(keyframes))
+    for i, name in keyframes.items():  # Write the images in the output
+        cv2.imwrite(output + '/' + name, name_img[name])
 
     return keyframes
 
 
-def write_video(keyframes, input, output, S, name_histr, name_img, names, H, centroids):
+def write_video(keyframes, input, output, S, name_histr, name_img, names, H, classified_images):
 
     img = list(name_img.values())[0]
     heigth, width, channels = img.shape  # Obtain the dimensions of the frames to the video
@@ -231,13 +248,29 @@ def write_video(keyframes, input, output, S, name_histr, name_img, names, H, cen
     # Initialize the video writer
     video = cv2.VideoWriter(output + '/result.avi', fourcc, 30.0, (width, heigth))
 
+    # Sort the keyframes names by the number in his name
     keyframes_names = list(set(keyframes.values()))
     keyframes_names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
 
-    for name in keyframes_names:
+    for name in keyframes_names:  # First iterate over the names
+
+        keyframe_k = None
+
+        for k, keyframe in keyframes.items():  # Now obtain his classification (K)
+            if name == keyframe:
+                keyframe_k = k
+
+        if keyframe_k is not None:  # We calculate an extra value in base of the images of the centroid
+            extra = len(classified_images[keyframe_k])
+        else:
+            extra = 0
+
+        extra = int(5*np.log2(extra)) + S  # Extra frames added in base of number of classified frames TODO: DOCUMENT
+
+        print(extra)
         index = names.index(str(name))  # Obtain the index inside the list for the name
-        up_index = index + S  # The top limit
-        down_index = index - S  # The bottom limit
+        up_index = index + extra  # The top limit
+        down_index = index - extra  # The bottom limit
 
         # Checks that we not surpass the limits
         if up_index > len(names):
@@ -245,34 +278,37 @@ def write_video(keyframes, input, output, S, name_histr, name_img, names, H, cen
         if down_index < 0:
             down_index = 0
 
-        # For every image apply KNN algorithm
+        # For every image apply KNN algorithm to the keyframes
         for image in names[down_index:up_index]:
             min_k = calc_knn(keyframes, name_histr, image, H)
-            print(image+' K:'+ str(min_k))
             if name == keyframes[min_k]:
                 print('writing:' + image)
                 video.write(cv2.imread(input + '/' + image))
 
+    # Needed functions after call videoWriter
     video.release()
     cv2.destroyAllWindows()
+
     print('\n\nOK your video is available')
 
 
 def calc_knn(keyframes, name_histr, image_name, H):
 
     image_histr = dict()
-    color = ('b', 'g', 'r')
+    color = ('v', 'h', 's')
     image_path = os.path.join(inputpath, image_name)
-    img = cv2.imread(image_path)
+    img = cv2.imread(image_path)  # Read the image to classify
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)  # Make the conversion of BGR to HSV color base
 
-    for j, col in enumerate(color):
-        image_histr[col] = list(map(lambda x: x[0], cv2.calcHist([img], [j], None, [H], [0, H])))
+    for j, col in enumerate(color):  # Calculate the histogram
+        image_histr[col] = list(map(lambda x: x[0], cv2.calcHist([hsv], [j], None, [H], [0, H])))
 
     min_value = float('inf')
     min_k = -1
-    for k, name in keyframes.items():
+
+    for k, name in keyframes.items():  # Calculates the nearest keyframe and return his classification (K)
         value = 0
-        for j, col in enumerate(color):
+        for j, col in enumerate(color):  # Calculate the euclidean distance
             value += sum(
                 np.sqrt(np.power([x1 - x2 for (x1, x2) in zip(name_histr[name][col], image_histr[col])], 2)))
 
@@ -285,5 +321,5 @@ def calc_knn(keyframes, name_histr, image_name, H):
 
 if __name__ == '__main__':
     inputpath = "C:/Users/Manue/Documents/IA/ProyectoIA/test"
-    outputpath = "C:/Users/Manue/Documents/IA/ProyectoIA/results"
-    main(inputpath, 15, 60, 256, 100, 3, 30, outputpath)
+    outputpath = "C:/Users/Manue/Documents/IA/ProyectoIA/resultsNuminous"
+    main(inputpath, 10, 5, 256, 1000, 3, 30, outputpath)
