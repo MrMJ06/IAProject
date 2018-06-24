@@ -419,8 +419,9 @@ def progress(count, total, status=''):
     percents = round(100.0 * count / float(total), 1)
     bar = '=' * filled_len + '-' * (bar_len - filled_len)
 
-    print('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
-    sys.stdout.flush()
+    output = '[%s] %s%s ...%s\r' % (bar, percents, '%', status)
+    print(output)
+    app.setTitle(output)
 
 
 # create a GUI variable called app
@@ -458,6 +459,7 @@ app.addEntry('N', 6, 1, 1)
 
 app.addLabel("LabelS", "S (Frames for videos)", 7, 0, 1)
 app.addEntry('S', 7, 1, 1)
+
 
 
 #VALORES POR DEFECTO:
