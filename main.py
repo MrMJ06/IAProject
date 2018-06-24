@@ -2,6 +2,12 @@ import os
 import cv2
 from matplotlib import pyplot as plt
 import numpy as np
+from tkinter.filedialog import askdirectory
+import sys
+from os import listdir
+from os.path import isfile, join
+import time
+from appJar import gui
 
 """ 
 INPUTPATH -> Path for the frames directory
@@ -15,19 +21,35 @@ OUTPUTPATH -> Path for the keyframes and video writing
 """
 
 
-def main(inputpath, K, T, H, it, n, s, outputpath):
+def summ_allvideos(inputpath, K, T, H, it, n, s):
+    videos = [f for f in listdir(inputpath) if isfile(join(inputpath, f))]
+    for x in videos:
+        if x.endswith(".mp4") or x.endswith(".mpg") or x.endswith(".avi"):
+            print("Summarizing video: " + x)
+        summ_Video(inputpath, K, T, H, it, n, s, x)
 
-    image_names = os.listdir(inputpath)  # Reads the image names
+
+def summ_Video(inputpath, K, T, H, it, n, s, videoName):
+
+    framesfolder = get_frames_folder(inputpath, videoName)
+    print(framesfolder)
+    if not os.path.isdir(framesfolder):
+        os.makedirs(framesfolder)
+
+    image_names = os.listdir(framesfolder)  # Reads the image names
+    if len(image_names) < 3:  # Frames already generated, start algorithm
+        video_to_frames(inputpath + "/" + videoName, framesfolder)
+        image_names = os.listdir(framesfolder)  # Reload image list after creating it
 
     # Sort the image names by the number in the name
     image_names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
 
     print('Readed images:'+str(image_names))
-    print('\n\n')
+    print('\n')
 
     # Returns a dict with the name and the histogram of every image
     # and another dict with the name and the image array readed
-    name_histr_name_img = calc_histr(inputpath, T, image_names, H)
+    name_histr_name_img = calc_histr(framesfolder, T, image_names, H)
 
     name_histr = name_histr_name_img[0]  # Save the name - histogram dictionary in a variable
     name_img = name_histr_name_img[1]  # Save the name - image array dictionary in a variable
@@ -36,14 +58,15 @@ def main(inputpath, K, T, H, it, n, s, outputpath):
     centroids, classified_images = k_means(K, name_histr, it, n)
 
     # With the centroids we obtain the keyframes and write them in outpath
-    keyframes = write_keyframes(name_img, name_histr, centroids, classified_images, outputpath)
+    keyframes = write_keyframes(name_img, name_histr, centroids, classified_images, get_keyframes_result_folder(inputpath, videoName))
 
     # With the keyframes we reconstruct the summary video and write it in outpath
-    write_video(keyframes, inputpath, outputpath, s, name_histr, name_img, image_names, H, classified_images)
+    if not os.path.isdir(get_videos_result_folder(inputpath)):
+        os.makedirs(get_videos_result_folder(inputpath))
+    write_video(keyframes, framesfolder, s, name_histr, name_img, image_names, H, classified_images, get_videos_result_folder(inputpath) + "/summarized-" + videoName.split('.')[0])
 
 
 """ ----------------------- Calc_ histr -------------------------------- """
-
 
 def calc_histr(inputpath, T, image_names, H):
 
@@ -52,7 +75,7 @@ def calc_histr(inputpath, T, image_names, H):
     name_image = dict()
 
     color = ('v', 'h', 's')  # Initiate the channels in the image
-
+    progress(0, len(image_names)/T, 'Calculating histograms')
     # Iterate in every image name index with a skip of T frames
     for i in range(0, len(image_names), T):
 
@@ -71,6 +94,7 @@ def calc_histr(inputpath, T, image_names, H):
 
         # When the 3 color channels are calculated in the histogram we saves it in the image hisstogram dictionary
         name_histogram[image_names[i]] = histr
+        progress(len(name_histogram), len(image_names) / T, 'Calculating histograms')
 
     return [name_histogram, name_image]
 
@@ -86,7 +110,8 @@ def k_means(K, name_histr, iterations, n, centroids=None):
 
     for it in range(0, iterations):  # The iterations will be limited
 
-        print('Iteration number: ' + str(it))
+        progress(it, iterations, 'Classifiying frames')
+        #  print('Iteration number: ' + str(it))
 
         if centroids is None:  # If the initial centroids are not passed as parameter calculate k random centroids
             centroids = calc_random_centroids(K, n, name_histr)  # Return the random centroids
@@ -101,6 +126,7 @@ def k_means(K, name_histr, iterations, n, centroids=None):
         else:
             # If the centroids has not changed the stop
             if list(last_classification.values()) == list(classified_images.values()):
+                progress(iterations, iterations, 'Classifiying frames')
                 break
             else:  # In other case continue
                 last_classification = classified_images
@@ -218,6 +244,7 @@ def write_keyframes(name_img, name_histr, centroids, classified_images, output):
 
     for i, k_histr in centroids.items():  # First iterate over all the centroids
 
+        progress(i, len(centroids), 'Calculating keyframes')
         min_value = float('inf')
 
         for name in classified_images[i]:  # Now we calculate the nearest image
@@ -233,12 +260,13 @@ def write_keyframes(name_img, name_histr, centroids, classified_images, output):
 
     print('Writing images: ' + str(keyframes))
     for i, name in keyframes.items():  # Write the images in the output
+        progress(i, len(keyframes), 'Writing keyframes')
         cv2.imwrite(output + '/' + name, name_img[name])
 
     return keyframes
 
 
-def write_video(keyframes, input, output, S, name_histr, name_img, names, H, classified_images):
+def write_video(keyframes, input, S, name_histr, name_img, names, H, classified_images, output):
 
     img = list(name_img.values())[0]
     heigth, width, channels = img.shape  # Obtain the dimensions of the frames to the video
@@ -246,14 +274,16 @@ def write_video(keyframes, input, output, S, name_histr, name_img, names, H, cla
     fourcc = cv2.VideoWriter_fourcc(*'XVID') # Generate the fourcc code nedded to write the video
 
     # Initialize the video writer
-    video = cv2.VideoWriter(output + '/result.avi', fourcc, 30.0, (width, heigth))
+    video = cv2.VideoWriter(output + '.avi', fourcc, 30.0, (width, heigth))
 
     # Sort the keyframes names by the number in his name
     keyframes_names = list(set(keyframes.values()))
     keyframes_names.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
-
+    i = 0
     for name in keyframes_names:  # First iterate over the names
 
+        i += 1
+        progress(i, len(keyframes_names), 'Writing video')
         keyframe_k = None
 
         for k, keyframe in keyframes.items():  # Now obtain his classification (K)
@@ -267,7 +297,6 @@ def write_video(keyframes, input, output, S, name_histr, name_img, names, H, cla
 
         extra = int(5*np.log2(extra)) + S  # Extra frames added in base of number of classified frames TODO: DOCUMENT
 
-        print(extra)
         index = names.index(str(name))  # Obtain the index inside the list for the name
         up_index = index + extra  # The top limit
         down_index = index - extra  # The bottom limit
@@ -280,11 +309,9 @@ def write_video(keyframes, input, output, S, name_histr, name_img, names, H, cla
 
         # For every image apply KNN algorithm to the keyframes
         for image in names[down_index:up_index]:
-            min_k = calc_knn(keyframes, name_histr, image, H)
+            min_k = calc_knn(keyframes, name_histr, image, H, input)
             if name == keyframes[min_k]:
-                print('writing:' + image)
                 video.write(cv2.imread(input + '/' + image))
-
     # Needed functions after call videoWriter
     video.release()
     cv2.destroyAllWindows()
@@ -292,7 +319,7 @@ def write_video(keyframes, input, output, S, name_histr, name_img, names, H, cla
     print('\n\nOK your video is available')
 
 
-def calc_knn(keyframes, name_histr, image_name, H):
+def calc_knn(keyframes, name_histr, image_name, H, inputpath):
 
     image_histr = dict()
     color = ('v', 'h', 's')
@@ -319,7 +346,133 @@ def calc_knn(keyframes, name_histr, image_name, H):
     return min_k
 
 
-if __name__ == '__main__':
-    inputpath = "C:/Users/Manue/Documents/IA/ProyectoIA/test"
-    outputpath = "C:/Users/Manue/Documents/IA/ProyectoIA/resultsNuminous"
-    main(inputpath, 10, 5, 256, 1000, 3, 30, outputpath)
+def get_keyframes_result_folder(input, videoName):
+    return input + "/resultFrames/" + videoName.split('.')[0]
+
+
+def get_videos_result_folder(input):
+    return input + "/resultVideos"
+
+
+def get_frames_folder(input, videoName):
+    return get_frames_general_folder(input) + "/" + videoName.split(".")[0]
+
+
+def get_frames_general_folder(input):
+    return input + "/frames"
+
+
+def create_or_clear_folder(folder):
+    if not os.path.isdir(folder):  # If the directory not exists, creates the directory
+        os.makedirs(folder)
+    else:
+        image_names = os.listdir(folder)
+        for name in image_names:  # Remove the content of the directory
+            os.remove(folder+'/'+name)
+
+
+def video_to_frames(input_loc, output_loc):
+    """Function to extract frames from input video file
+    and save them as separate frames in an output directory.
+    Args:
+        input_loc: Input video file.
+        output_loc: Output directory to save the frames.
+    Returns:
+        None
+    """
+    try:
+        os.mkdir(output_loc)
+    except OSError:
+        pass
+    # Log the time
+    time_start = time.time()
+    # Start capturing the feed
+    cap = cv2.VideoCapture(input_loc)
+    # Find the number of frames
+    video_length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - 2
+    count = 0
+    # Start converting the video
+    while cap.isOpened():
+        progress(count, video_length, 'Converting video' + input_loc)
+        # Extract the frame
+        ret, frame = cap.read()
+        # Write the results back to output location.
+        cv2.imwrite(output_loc + "/%#05d.jpg" % (count + 1), frame)
+        count = count + 1
+        # If there are no more frames left
+        if count > (video_length - 1):
+            # Log the time again
+            time_end = time.time()
+            # Release the feed
+            cap.release()
+            cv2.destroyAllWindows()
+            # Print stats
+            progress(count, video_length, 'Video' + input_loc+ ' extracted in '+str((time_end - time_start)))
+            break
+
+
+def progress(count, total, status=''):
+
+    bar_len = 60
+    filled_len = int(round(bar_len * count / float(total)))
+
+    percents = round(100.0 * count / float(total), 1)
+    bar = '=' * filled_len + '-' * (bar_len - filled_len)
+
+    print('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
+    sys.stdout.flush()
+
+
+# create a GUI variable called app
+app = gui("Video Summarization", "800x400")
+app.setBg("#f4f3ed")
+app.setFont(18)
+# add & configure widgets - widgets get a name, to help referencing them later
+app.addLabel("title", "Video Summarization", 0 , 0, 3 )
+app.setLabelBg("title", "black")
+app.setLabelFg("title", "white")
+
+
+def add_file_input(btn):
+    filename = askdirectory()
+    app.setEntry('Input', filename)
+
+
+app.addLabel("LabelIN", "Input Path", 1, 0, 1)
+app.addEntry('Input', 1, 1, 1)
+
+app.addLabel("LabelK", "K (Centroids)", 2, 0, 1)
+app.addEntry('K', 2, 1, 1)
+
+app.addLabel("LabelT", "T (Skipped frames)", 3, 0, 1)
+app.addEntry('T', 3, 1, 1)
+
+app.addLabel("LabelH", "H (X histogram size)", 4, 0, 1)
+app.addEntry('H', 4, 1, 1)
+
+app.addLabel("LabelI", "Iterations", 5, 0, 1)
+app.addEntry('I', 5, 1, 1)
+
+app.addLabel("LabelN", "N", 6, 0, 1)
+app.addEntry('N', 6, 1, 1)
+
+app.addLabel("LabelS", "S (Frames for videos)", 7, 0, 1)
+app.addEntry('S', 7, 1, 1)
+
+
+#VALORES POR DEFECTO:
+app.setEntry("K", 10)
+app.setEntry("T", 1)
+app.setEntry("H", 256)
+app.setEntry("I", 50)
+app.setEntry("N", 3)
+app.setEntry("S", 20)
+
+app.addButton('Select folder', add_file_input , 1 , 2,1)
+
+# link the buttons to the function called press
+app.addButtons(["Summarize"], lambda *args: summ_allvideos(app.getEntry("Input"), int(app.getEntry("K")), int(app.getEntry("T")), int(app.getEntry("H")), int(app.getEntry("I")), int(app.getEntry("N")), int(app.getEntry("S"))), 8,1,1)
+
+
+# start the GUI
+app.go()
