@@ -106,7 +106,6 @@ def k_means(K, name_histr, iterations, n, centroids=None):
 
     last_classification = None  # The centroids of the last iteration
     classified_images = dict()
-    color = ('v', 'h', 's')
 
     for it in range(0, iterations):  # The iterations will be limited
 
