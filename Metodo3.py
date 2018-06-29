@@ -23,15 +23,15 @@ OUTPUTPATH -> Path for the keyframes and video writing
 """
 
 
-def summ_allvideos(inputpath, K, T, H, it, n, s):
+def summ_allvideos(inputpath, K, T, H, it, n, s, knn):
     videos = [f for f in listdir(inputpath) if isfile(join(inputpath, f))]
     for x in videos:
         if x.endswith(".mp4") or x.endswith(".mpg") or x.endswith(".avi"):
             print("Summarizing video: " + x)
-        summ_Video(inputpath, K, T, H, it, n, s, x)
+        summ_Video(inputpath, K, T, H, it, n, s, x, knn)
 
 
-def summ_Video(inputpath, K, T, H, it, n, s, videoName):
+def summ_Video(inputpath, K, T, H, it, n, s, videoName, knn):
     output_gui("========= Start video summarization : "+ videoName + " =============")
     timestart2 = time.time()
     framesfolder = get_frames_folder(inputpath, videoName)
@@ -66,7 +66,7 @@ def summ_Video(inputpath, K, T, H, it, n, s, videoName):
     # With the keyframes we reconstruct the summary video and write it in outpath
     if not os.path.isdir(get_videos_result_folder(inputpath)):
         os.makedirs(get_videos_result_folder(inputpath))
-    write_video(keyframes, framesfolder, s, name_histr, name_img, image_names, H, classified_images, get_videos_result_folder(inputpath) + "/summarized-" + videoName.split('.')[0], K)
+    write_video(keyframes, framesfolder, s, name_histr, name_img, image_names, H, classified_images, get_videos_result_folder(inputpath) + "/summarized-" + videoName.split('.')[0], K, knn)
     output_gui("========= FINISH : " + videoName + " (in " + str(math.trunc(time.time()-timestart2)) +"s) =============")
 
 """ ----------------------- Calc_ histr -------------------------------- """
@@ -284,7 +284,7 @@ def write_keyframes(name_img, name_histr, centroids, classified_images, output):
     return keyframes
 
 
-def write_video(keyframes, input, S, name_histr, name_img, names, H, classified_images, output, K):
+def write_video(keyframes, input, S, name_histr, name_img, names, H, classified_images, output, K, knn):
     timestart9 = time.time()
     img = list(name_img.values())[0]
     heigth, width, channels = img.shape  # Obtain the dimensions of the frames to the video
@@ -327,7 +327,7 @@ def write_video(keyframes, input, S, name_histr, name_img, names, H, classified_
 
         # For every image apply KNN algorithm to the keyframes
         for image in names[down_index:up_index]:
-            min_k = calc_knn(name_histr, image, H, 3, K, classified_images, input)
+            min_k = calc_knn(name_histr, image, H, knn, K, classified_images, input)
             if name == keyframes[min_k]:
                 video.write(cv2.imread(input + '/' + image))
     # Needed functions after call videoWriter
@@ -485,7 +485,8 @@ app.addEntry('N', 6, 1, 1)
 
 app.addLabel("LabelS", "S (Frames for videos)", 7, 0, 1)
 app.addEntry('S', 7, 1, 1)
-
+app.addLabel("LabelKNN", "K (Knn)", 8, 0, 1)
+app.addEntry('knn', 8, 1, 1)
 
 
 #VALORES POR DEFECTO:
@@ -497,14 +498,13 @@ app.setEntry("N", 3)
 app.setEntry("S", 20)
 
 app.addButton('Select folder', add_file_input , 1 , 2,1)
-app.addLabel("TaskLabel", "Current Task:", 9, 0, 1)
-app.addLabel("Task", "Not working", 9, 1, 1)
-app.addMeter("progress", 10, 0, 3)
+app.addLabel("TaskLabel", "Current Task:", 10, 0, 1)
+app.addLabel("Task", "Not working", 10, 1, 1)
+app.addMeter("progress", 11, 0, 3)
 app.setMeterFill("progress", "green")
 
-app.addLabel("TaskOutput", "Output:", 11, 1, 1)
-app.addTextArea("Output", 12, 0, 3)
-
+app.addLabel("TaskOutput", "Output:", 12, 1, 1)
+app.addTextArea("Output", 13, 0, 3)
 lastMeter = 0
 
 
@@ -516,7 +516,7 @@ def updateMeter(percentComplete):
         lastMeter = percent
 
 # link the buttons to the function called press
-t = threading.Thread(target=lambda *args: summ_allvideos(app.getEntry("Input"), int(app.getEntry("K")), int(app.getEntry("T")), int(app.getEntry("H")), int(app.getEntry("I")), int(app.getEntry("N")), int(app.getEntry("S")) ) )
+t = threading.Thread(target=lambda *args: summ_allvideos(app.getEntry("Input"), int(app.getEntry("K")), int(app.getEntry("T")), int(app.getEntry("H")), int(app.getEntry("I")), int(app.getEntry("N")), int(app.getEntry("S")), int(app.getEntry("knn")) ) )
 app.addButtons(["Summarize"], t.start, 8,1,1)
 
 
