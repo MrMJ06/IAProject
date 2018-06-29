@@ -485,6 +485,7 @@ app.addEntry('N', 6, 1, 1)
 
 app.addLabel("LabelS", "S (Frames for videos)", 7, 0, 1)
 app.addEntry('S', 7, 1, 1)
+
 app.addLabel("LabelKNN", "K (Knn)", 8, 0, 1)
 app.addEntry('knn', 8, 1, 1)
 
@@ -496,6 +497,7 @@ app.setEntry("H", 256)
 app.setEntry("I", 50)
 app.setEntry("N", 3)
 app.setEntry("S", 20)
+app.setEntry("knn", 3)
 
 app.addButton('Select folder', add_file_input , 1 , 2,1)
 app.addLabel("TaskLabel", "Current Task:", 10, 0, 1)
@@ -517,8 +519,7 @@ def updateMeter(percentComplete):
 
 # link the buttons to the function called press
 t = threading.Thread(target=lambda *args: summ_allvideos(app.getEntry("Input"), int(app.getEntry("K")), int(app.getEntry("T")), int(app.getEntry("H")), int(app.getEntry("I")), int(app.getEntry("N")), int(app.getEntry("S")), int(app.getEntry("knn")) ) )
-app.addButtons(["Summarize"], t.start, 8,1,1)
-
+app.addButtons(["Summarize"], t.start, 9, 1, 1)
 
 
 def output_gui(text):

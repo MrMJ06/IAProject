@@ -88,12 +88,11 @@ def calc_histr(inputpath, T, image_names, H):
 
         img = cv2.imread(input_path)  # Read the array image in RGB
         name_image[image_names[i]] = img  # Saves the image in the dictionary
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
         for j, col in enumerate(color):  # For every color chanel calculate the histgram
 
             # We use the map function to correct the histogram format and saves it the the histogram color channel
-            histr[col] = list(map(lambda x: x[0], cv2.calcHist([hsv], [j], None, [H], [0, H])))
+            histr[col] = list(map(lambda x: x[0], cv2.calcHist([img], [j], None, [H], [0, H])))
 
         # When the 3 color channels are calculated in the histogram we saves it in the image hisstogram dictionary
         name_histogram[image_names[i]] = histr
@@ -342,10 +341,9 @@ def calc_knn(keyframes, name_histr, image_name, H, inputpath):
     color = ('r', 'g', 'b')
     image_path = os.path.join(inputpath, image_name)
     img = cv2.imread(image_path)  # Read the image to classify
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)  # Make the conversion of BGR to HSV color base
 
     for j, col in enumerate(color):  # Calculate the histogram
-        image_histr[col] = list(map(lambda x: x[0], cv2.calcHist([hsv], [j], None, [H], [0, H])))
+        image_histr[col] = list(map(lambda x: x[0], cv2.calcHist([img], [j], None, [H], [0, H])))
 
     min_value = float('inf')
     min_k = -1
