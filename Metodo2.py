@@ -409,7 +409,7 @@ def video_to_frames(input_loc, output_loc):
     count = 0
     # Start converting the video
     while cap.isOpened():
-        progress(count, video_length, 'Converting video' + input_loc)
+        progress(count, video_length, 'Converting video')
         # Extract the frame
         ret, frame = cap.read()
         # Write the results back to output location.
@@ -502,7 +502,7 @@ app.addTextArea("Output", 12, 0, 3)
 lastMeter = 0
 def updateMeter(percentComplete):
     global lastMeter
-    percent = math.trunc(percentComplete);
+    percent = math.trunc(percentComplete)
     if percent != lastMeter:
         app.setMeter("progress", percentComplete)
         lastMeter = percent

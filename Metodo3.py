@@ -327,7 +327,7 @@ def write_video(keyframes, input, S, name_histr, name_img, names, H, classified_
 
         # For every image apply KNN algorithm to the keyframes
         for image in names[down_index:up_index]:
-            min_k = calc_knn(keyframes, name_histr, image, H, 3, K, classified_images, input)
+            min_k = calc_knn(name_histr, image, H, 3, K, classified_images, input)
             if name == keyframes[min_k]:
                 video.write(cv2.imread(input + '/' + image))
     # Needed functions after call videoWriter
@@ -336,11 +336,11 @@ def write_video(keyframes, input, S, name_histr, name_img, names, H, classified_
     output_gui("Write video finished in: " + str(math.trunc(time.time() - timestart9)) + "s")
     print('\n\nOK your video is available')
 
-def calc_knn(keyframes, name_histr, image_name, H, K_knn, K, classified_images, framespath):
+def calc_knn(name_histr, image_name, H, K_knn, K, classified_images, framespath):
     images_distances = dict()
     nearest_keyframes = {k: 0 for k in range(0, K)}
     image_histr = dict()
-    color = ('b', 'g', 'r')
+    color = ('v', 'h', 's')
     image_path = os.path.join(framespath, image_name)
     img = cv2.imread(image_path)
 
@@ -415,7 +415,7 @@ def video_to_frames(input_loc, output_loc):
     count = 0
     # Start converting the video
     while cap.isOpened():
-        progress(count, video_length, 'Converting video' + input_loc)
+        progress(count, video_length, 'Converting video')
         # Extract the frame
         ret, frame = cap.read()
         # Write the results back to output location.
@@ -506,9 +506,11 @@ app.addLabel("TaskOutput", "Output:", 11, 1, 1)
 app.addTextArea("Output", 12, 0, 3)
 
 lastMeter = 0
+
+
 def updateMeter(percentComplete):
     global lastMeter
-    percent = math.trunc(percentComplete);
+    percent = math.trunc(percentComplete)
     if percent != lastMeter:
         app.setMeter("progress", percentComplete)
         lastMeter = percent

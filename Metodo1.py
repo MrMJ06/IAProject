@@ -409,7 +409,7 @@ def video_to_frames(input_loc, output_loc):
     count = 0
     # Start converting the video
     while cap.isOpened():
-        progress(count, video_length, 'Converting video' + input_loc)
+        progress(count, video_length, 'Converting video')
         # Extract the frame
         ret, frame = cap.read()
         # Write the results back to output location.
@@ -502,7 +502,7 @@ app.addTextArea("Output", 12, 0, 3)
 lastMeter = 0
 def updateMeter(percentComplete):
     global lastMeter
-    percent = math.trunc(percentComplete);
+    percent = math.trunc(percentComplete)
     if percent != lastMeter:
         app.setMeter("progress", percentComplete)
         lastMeter = percent
@@ -510,7 +510,6 @@ def updateMeter(percentComplete):
 # link the buttons to the function called press
 t = threading.Thread(target=lambda *args: summ_allvideos(app.getEntry("Input"), int(app.getEntry("K")), int(app.getEntry("T")), int(app.getEntry("H")), int(app.getEntry("I")), int(app.getEntry("N")), int(app.getEntry("S")) ) )
 app.addButtons(["Summarize"], t.start, 8,1,1)
-
 
 
 def output_gui(text):
