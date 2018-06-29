@@ -116,7 +116,7 @@ def k_means(K, name_histr, iterations, n, centroids=None):
         #  print('Iteration number: ' + str(it))
 
         if centroids is None:  # If the initial centroids are not passed as parameter calculate k random centroids
-            centroids = calc_jumping_centroids(K, n, name_histr)  # Return the random centroids
+            centroids = calc_jumping_centroids(K, name_histr)  # Return the random centroids
 
         classified_images = classify_images(centroids, name_histr)  # Classify the images
 
@@ -139,7 +139,8 @@ def k_means(K, name_histr, iterations, n, centroids=None):
 """ ---------------------------- Centroids jumping ----------------------------- """
 # Return k random centroids jumping between frames
 
-def calc_jumping_centroids(K, n, name_histr):
+
+def calc_jumping_centroids(K, name_histr):
     timestart5 = time.time()
     centroids = dict()
     color = ('v', 'h', 's')  # Initialize the color channels
